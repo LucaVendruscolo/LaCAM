@@ -1,30 +1,23 @@
-// =============================================================================
-// DATA MODELS
-// =============================================================================
-
-// Agent colors - all white for consistent minimalist look
 const AGENT_COLORS = ['#ffffff', '#ffffff', '#ffffff', '#ffffff', '#ffffff', '#ffffff'];
 
-// Graph class - represents the environment
 class Graph {
     constructor() {
-        this.vertices = new Map(); // Map<id, {id, x, y, label}>
-        this.edges = new Map();    // Map<id, {id, v1, v2}>
-        this.adjacency = new Map(); // Map<vertexId, Set<vertexId>>
+        this.vertices = new Map();
+        this.edges = new Map();
+        this.adjacency = new Map();
         this.nextVertexId = 0;
         this.nextEdgeId = 0;
     }
 
     addVertex(x, y) {
         const id = this.nextVertexId++;
-        const label = String.fromCharCode(97 + id); // a, b, c, ...
+        const label = String.fromCharCode(97 + id);
         this.vertices.set(id, { id, x, y, label });
         this.adjacency.set(id, new Set());
         return id;
     }
 
     removeVertex(id) {
-        // Remove all edges connected to this vertex
         const toRemove = [];
         this.edges.forEach((edge, edgeId) => {
             if (edge.v1 === id || edge.v2 === id) {
@@ -32,18 +25,13 @@ class Graph {
             }
         });
         toRemove.forEach(edgeId => this.removeEdge(edgeId));
-
-        // Remove from adjacency
         this.adjacency.delete(id);
         this.adjacency.forEach(neighbors => neighbors.delete(id));
-
-        // Remove vertex
         this.vertices.delete(id);
     }
 
     addEdge(v1, v2) {
         if (v1 === v2) return null;
-        // Check if edge already exists
         for (const [id, edge] of this.edges) {
             if ((edge.v1 === v1 && edge.v2 === v2) || (edge.v1 === v2 && edge.v2 === v1)) {
                 return null;
@@ -95,7 +83,6 @@ class Graph {
     }
 }
 
-// Agent class
 class Agent {
     constructor(id, startVertexId = null, goalVertexId = null) {
         this.id = id;
@@ -111,7 +98,6 @@ class Agent {
     }
 }
 
-// Configuration class - tuple of agent locations
 class Configuration {
     constructor(locations) {
         this.locations = [...locations];
@@ -142,15 +128,14 @@ class Configuration {
     }
 }
 
-// High-level search node
 let hlNodeIdCounter = 0;
 class HighLevelNode {
     constructor(config, parent = null) {
         this.id = hlNodeIdCounter++;
         this.config = config;
-        this.tree = [];           // Queue of LowLevelNode
-        this.treeRoot = null;     // Root LowLevelNode
-        this.order = [];          // Agent priority order
+        this.tree = [];
+        this.treeRoot = null;
+        this.order = [];
         this.parent = parent;
     }
 
@@ -158,19 +143,17 @@ class HighLevelNode {
         const n = new HighLevelNode(this.config.clone(), null);
         n.id = this.id;
         n.order = [...this.order];
-        // Note: tree and treeRoot cloning is complex, handled separately
         return n;
     }
 }
 
-// Low-level search node (constraint)
 let llNodeIdCounter = 0;
 class LowLevelNode {
     constructor(parent = null, who = null, where = null) {
         this.id = llNodeIdCounter++;
         this.parent = parent;
-        this.who = who;           // Agent id (null for root)
-        this.where = where;       // Vertex id (null for root)
+        this.who = who;
+        this.where = where;
         this.children = [];
         this.depth = parent ? parent.depth + 1 : 0;
         this.isSearched = false;
@@ -192,10 +175,6 @@ class LowLevelNode {
         return `${this.who + 1}→${graph.getVertexLabel(this.where)}`;
     }
 }
-
-// =============================================================================
-// LACAM ALGORITHM
-// =============================================================================
 
 class LaCAM {
     constructor(graph, agents) {
@@ -224,20 +203,14 @@ class LaCAM {
             configurationsExplored: 1
         };
 
-        // Create start configuration
         const startLocations = this.agents.map(a => a.start);
         const startConfig = new Configuration(startLocations);
-
-        // Create initial constraint tree root
         const Cinit = new LowLevelNode(null, null, null);
-
-        // Create initial high-level node
         const Ninit = new HighLevelNode(startConfig, null);
         Ninit.treeRoot = Cinit;
         Ninit.tree = [Cinit];
         Ninit.order = this.getInitOrder();
 
-        // Initialize Open and Explored
         this.state.open.push(Ninit);
         this.state.explored.set(startConfig.hash(), Ninit);
         this.state.currentHighLevelNode = Ninit;
@@ -248,7 +221,6 @@ class LaCAM {
     }
 
     getInitOrder() {
-        // Sort agents by distance from start to goal (descending)
         return [...this.agents]
             .map(a => ({
                 id: a.id,
@@ -259,7 +231,6 @@ class LaCAM {
     }
 
     getOrder(config) {
-        // Prioritize agents not at goal
         return [...this.agents]
             .map(a => ({
                 id: a.id,
@@ -277,7 +248,6 @@ class LaCAM {
         if (from === to) return 0;
         if (from === null || to === null) return Infinity;
 
-        // BFS
         const visited = new Set([from]);
         const queue = [{ vertex: from, dist: 0 }];
 
@@ -318,17 +288,15 @@ class LaCAM {
     }
 
     stepSelect() {
-        // Check if Open is empty
         if (this.state.open.length === 0) {
             this.state.status = 'no_solution';
             this.state.description = 'Open is empty - NO SOLUTION exists';
             return false;
         }
 
-        const N = this.state.open[this.state.open.length - 1]; // peek top
+        const N = this.state.open[this.state.open.length - 1];
         this.state.currentHighLevelNode = N;
 
-        // Check if goal reached
         const goalConfig = new Configuration(this.agents.map(a => a.goal));
         if (N.config.equals(goalConfig)) {
             this.state.solution = this.backtrack(N);
@@ -337,7 +305,6 @@ class LaCAM {
             return false;
         }
 
-        // Check if tree is empty (all constraints exhausted)
         if (N.tree.length === 0) {
             this.state.open.pop();
             this.state.description = `High-level node N${N.id} exhausted all constraints. Popped from Open.`;
@@ -351,9 +318,9 @@ class LaCAM {
 
     stepPopConstraint() {
         const N = this.state.currentHighLevelNode;
-        const C = N.tree.shift(); // pop from front (BFS order)
+        const C = N.tree.shift();
         C.isSelected = true;
-        C.isSearched = true; // Mark as searched when popped from queue
+        C.isSearched = true;
         this.state.currentLowLevelNode = C;
 
         const label = C.who === null ? 'root' : `agent ${C.who + 1} → ${this.graph.getVertexLabel(C.where)}`;
@@ -367,18 +334,15 @@ class LaCAM {
         const C = this.state.currentLowLevelNode;
 
         if (C.depth < this.agents.length) {
-            // Expand constraint tree for next agent
             const agentId = N.order[C.depth];
             const currentVertex = N.config.get(agentId);
             const neighbors = [...this.graph.getNeighbors(currentVertex)];
 
-            // Add constraint nodes for staying and moving to neighbors
             const moves = [currentVertex, ...neighbors];
             for (const vertex of moves) {
                 const Cnew = new LowLevelNode(C, agentId, vertex);
                 C.children.push(Cnew);
                 N.tree.push(Cnew);
-                // Note: isSearched stays false (pending) until this node is popped
             }
 
             const labels = moves.map(v => this.graph.getVertexLabel(v)).join(', ');
@@ -395,10 +359,7 @@ class LaCAM {
         const N = this.state.currentHighLevelNode;
         const C = this.state.currentLowLevelNode;
 
-        // Get constraints from path to root
         const constraints = C.getConstraints();
-
-        // Generate new configuration following constraints
         const Qnew = this.generateConfig(N.config, constraints);
 
         if (Qnew === null) {
@@ -418,21 +379,18 @@ class LaCAM {
         const Qnew = this.state.generatedConfig;
         const N = this.state.currentHighLevelNode;
 
-        // Check if already explored
         if (this.state.explored.has(Qnew.hash())) {
             this.state.description = `Configuration ${Qnew.toString(this.graph)} already explored - skipping`;
             this.state.phase = 'select';
             return true;
         }
 
-        // Create new high-level node
         const Cinit = new LowLevelNode(null, null, null);
         const Nnew = new HighLevelNode(Qnew, N);
         Nnew.treeRoot = Cinit;
         Nnew.tree = [Cinit];
         Nnew.order = this.getOrder(Qnew);
 
-        // Add to Open and Explored
         this.state.open.push(Nnew);
         this.state.explored.set(Qnew.hash(), Nnew);
 
@@ -448,7 +406,6 @@ class LaCAM {
         const newLocations = new Array(this.agents.length);
         const occupiedNext = new Set();
 
-        // Process agents - constrained first, then by priority
         const constrainedAgents = [];
         const unconstrainedAgents = [];
 
@@ -460,37 +417,33 @@ class LaCAM {
             }
         }
 
-        // Sort unconstrained by distance to goal (descending)
         unconstrainedAgents.sort((a, b) => {
             const distA = this.getDistance(currentConfig.get(a.id), a.goal);
             const distB = this.getDistance(currentConfig.get(b.id), b.goal);
             return distB - distA;
         });
 
-        // First, place constrained agents
         for (const agent of constrainedAgents) {
             const nextPos = constraints.get(agent.id);
             if (occupiedNext.has(nextPos)) {
-                return null; // Vertex conflict among constrained agents
+                return null;
             }
             newLocations[agent.id] = nextPos;
             occupiedNext.add(nextPos);
         }
 
-        // Then, place unconstrained agents greedily
         for (const agent of unconstrainedAgents) {
             const currentPos = currentConfig.get(agent.id);
             let nextPos = this.getBestMove(agent.id, currentPos, agent.goal, occupiedNext);
 
             if (nextPos === null) {
-                return null; // Cannot find valid move
+                return null;
             }
 
             newLocations[agent.id] = nextPos;
             occupiedNext.add(nextPos);
         }
 
-        // Check for swap conflicts
         for (let i = 0; i < this.agents.length; i++) {
             for (let j = i + 1; j < this.agents.length; j++) {
                 const currI = currentConfig.get(i);
@@ -499,7 +452,7 @@ class LaCAM {
                 const nextJ = newLocations[j];
 
                 if (currI === nextJ && currJ === nextI) {
-                    return null; // Swap conflict
+                    return null;
                 }
             }
         }
@@ -508,7 +461,6 @@ class LaCAM {
     }
 
     getBestMove(agentId, current, goal, occupied) {
-        // If at goal and not occupied, stay
         if (current === goal && !occupied.has(current)) {
             return current;
         }
@@ -517,13 +469,11 @@ class LaCAM {
         let bestMove = null;
         let bestDist = Infinity;
 
-        // Try staying
         if (!occupied.has(current)) {
             bestMove = current;
             bestDist = this.getDistance(current, goal);
         }
 
-        // Try neighbors
         for (const neighbor of neighbors) {
             if (!occupied.has(neighbor)) {
                 const dist = this.getDistance(neighbor, goal);
@@ -549,7 +499,7 @@ class LaCAM {
 
     stepBack() {
         if (this.history.length > 1) {
-            this.history.pop(); // Remove current state
+            this.history.pop();
             const prevSnapshot = this.history[this.history.length - 1];
             this.restoreFromSnapshot(prevSnapshot);
             return true;
@@ -558,18 +508,12 @@ class LaCAM {
     }
 
     saveHistory() {
-        // Deep clone the entire algorithm state
         const snapshot = {
-            // Clone all high-level nodes with their constraint trees
             nodes: this.cloneAllNodes(),
-            // Store which node IDs are in Open (in order)
             openIds: this.state.open.map(n => n.id),
-            // Store explored config hashes -> node IDs
             exploredMap: new Map([...this.state.explored].map(([hash, node]) => [hash, node.id])),
-            // Current node IDs
             currentHighLevelNodeId: this.state.currentHighLevelNode?.id ?? null,
             currentLowLevelNodeId: this.state.currentLowLevelNode?.id ?? null,
-            // Simple state values
             stepNumber: this.state.stepNumber,
             phase: this.state.phase,
             description: this.state.description,
@@ -587,7 +531,6 @@ class LaCAM {
     }
 
     cloneAllNodes() {
-        // Create a map of all high-level nodes with their cloned constraint trees
         const nodesMap = new Map();
 
         const cloneLowLevelTree = (node, parentClone = null) => {
@@ -600,7 +543,6 @@ class LaCAM {
             return clone;
         };
 
-        // Collect all high-level nodes from Open and Explored
         const allNodes = new Map();
         this.state.open.forEach(n => allNodes.set(n.id, n));
         this.state.explored.forEach(n => allNodes.set(n.id, n));
@@ -608,13 +550,11 @@ class LaCAM {
         allNodes.forEach((node, id) => {
             const clonedTreeRoot = node.treeRoot ? cloneLowLevelTree(node.treeRoot) : null;
 
-            // Rebuild tree queue from cloned tree (BFS to find non-selected, searched nodes)
             const clonedTree = [];
             if (clonedTreeRoot) {
                 const queue = [clonedTreeRoot];
                 while (queue.length > 0) {
                     const n = queue.shift();
-                    // Add to tree if it's in the original tree (not yet processed)
                     const originalInTree = node.tree.some(t => t.id === n.id);
                     if (originalInTree) {
                         clonedTree.push(n);
@@ -637,21 +577,18 @@ class LaCAM {
     }
 
     restoreFromSnapshot(snapshot) {
-        // Rebuild high-level nodes from snapshot
         const nodeMap = new Map();
 
-        // First pass: create all nodes without parent links
         snapshot.nodes.forEach((data, id) => {
             const node = new HighLevelNode(data.config, null);
             node.id = data.id;
             node.treeRoot = data.treeRoot;
             node.tree = data.tree;
             node.order = data.order;
-            node._parentId = data.parentId; // Temporary storage
+            node._parentId = data.parentId;
             nodeMap.set(id, node);
         });
 
-        // Second pass: link parents
         nodeMap.forEach(node => {
             if (node._parentId !== null) {
                 node.parent = nodeMap.get(node._parentId) || null;
@@ -659,10 +596,8 @@ class LaCAM {
             delete node._parentId;
         });
 
-        // Rebuild Open stack
         this.state.open = snapshot.openIds.map(id => nodeMap.get(id)).filter(n => n);
 
-        // Rebuild Explored map
         this.state.explored = new Map();
         snapshot.exploredMap.forEach((nodeId, hash) => {
             const node = nodeMap.get(nodeId);
@@ -671,12 +606,10 @@ class LaCAM {
             }
         });
 
-        // Restore current node references
         this.state.currentHighLevelNode = snapshot.currentHighLevelNodeId !== null
             ? nodeMap.get(snapshot.currentHighLevelNodeId)
             : null;
 
-        // Find current low-level node within the current high-level node's tree
         this.state.currentLowLevelNode = null;
         if (snapshot.currentLowLevelNodeId !== null && this.state.currentHighLevelNode?.treeRoot) {
             const findLLNode = (node) => {
@@ -690,7 +623,6 @@ class LaCAM {
             this.state.currentLowLevelNode = findLLNode(this.state.currentHighLevelNode.treeRoot);
         }
 
-        // Restore simple values
         this.state.stepNumber = snapshot.stepNumber;
         this.state.phase = snapshot.phase;
         this.state.description = snapshot.description;
@@ -756,10 +688,6 @@ class LaCAM {
     }
 }
 
-// =============================================================================
-// APPLICATION
-// =============================================================================
-
 class App {
     constructor() {
         this.graph = new Graph();
@@ -768,12 +696,10 @@ class App {
         this.algorithm = null;
         this.isPlaying = false;
         this.playInterval = null;
-        this.mode = 'edit'; // edit, start, goal
+        this.mode = 'edit';
 
-        // Get device pixel ratio for high-DPI displays
         this.dpr = window.devicePixelRatio || 1;
 
-        // Canvas elements and contexts with high-DPI support
         this.graphCanvas = document.getElementById('graphCanvas');
         this.graphCtx = this.setupCanvas(this.graphCanvas, 400, 350);
 
@@ -783,7 +709,6 @@ class App {
         this.miniCanvas = document.getElementById('miniGraphCanvas');
         this.miniCtx = this.setupCanvas(this.miniCanvas, 150, 120);
 
-        // UI state
         this.dragStart = null;
         this.dragEnd = null;
         this.hoveredVertex = null;
@@ -792,34 +717,24 @@ class App {
         this.render();
     }
 
-    // Set up canvas for high-DPI displays
     setupCanvas(canvas, width, height) {
-        // Set display size (CSS)
         canvas.style.width = width + 'px';
         canvas.style.height = height + 'px';
-
-        // Set actual size in memory (scaled for retina)
         canvas.width = width * this.dpr;
         canvas.height = height * this.dpr;
-
-        // Get context and scale
         const ctx = canvas.getContext('2d');
         ctx.scale(this.dpr, this.dpr);
-
         return ctx;
     }
 
     initEventListeners() {
-        // Graph canvas events
         this.graphCanvas.addEventListener('mousedown', (e) => this.onCanvasMouseDown(e));
         this.graphCanvas.addEventListener('mousemove', (e) => this.onCanvasMouseMove(e));
         this.graphCanvas.addEventListener('mouseup', (e) => this.onCanvasMouseUp(e));
         this.graphCanvas.addEventListener('mouseleave', () => this.onCanvasMouseLeave());
 
-        // Keyboard
         document.addEventListener('keydown', (e) => this.onKeyDown(e));
 
-        // Mode selector
         document.querySelectorAll('input[name="mode"]').forEach(radio => {
             radio.addEventListener('change', (e) => {
                 this.mode = e.target.value;
@@ -827,7 +742,6 @@ class App {
             });
         });
 
-        // Toolbar buttons
         document.getElementById('clearGraphBtn').addEventListener('click', () => this.clearGraph());
         document.getElementById('addAgentBtn').addEventListener('click', () => this.addAgent());
         document.getElementById('removeAgentBtn').addEventListener('click', () => this.removeSelectedAgent());
@@ -837,7 +751,6 @@ class App {
         document.getElementById('stepBtn').addEventListener('click', () => this.stepForward());
         document.getElementById('playBtn').addEventListener('click', () => this.togglePlay());
 
-        // Example dropdown
         document.querySelectorAll('#exampleDropdown a').forEach(link => {
             link.addEventListener('click', (e) => {
                 e.preventDefault();
@@ -845,7 +758,6 @@ class App {
             });
         });
 
-        // Speed slider
         document.getElementById('speedSlider').addEventListener('input', (e) => {
             if (this.isPlaying) {
                 this.stopPlay();
@@ -854,7 +766,6 @@ class App {
         });
     }
 
-    // Canvas interactions
     onCanvasMouseDown(e) {
         const pos = this.getCanvasPos(e);
         const vertex = this.findVertexAt(pos.x, pos.y);
@@ -863,7 +774,6 @@ class App {
             if (vertex !== null) {
                 this.dragStart = vertex;
             } else {
-                // Add new vertex
                 this.graph.addVertex(pos.x, pos.y);
                 this.render();
             }
@@ -916,7 +826,6 @@ class App {
     onKeyDown(e) {
         if (e.key === 'Delete' || e.key === 'Backspace') {
             if (this.hoveredVertex !== null && this.mode === 'edit') {
-                // Check if any agent uses this vertex
                 const inUse = this.agents.some(a => a.start === this.hoveredVertex || a.goal === this.hoveredVertex);
                 if (!inUse) {
                     this.graph.removeVertex(this.hoveredVertex);
@@ -929,7 +838,6 @@ class App {
 
     getCanvasPos(e) {
         const rect = this.graphCanvas.getBoundingClientRect();
-        // Use CSS size (not canvas buffer size) for mouse position
         return {
             x: (e.clientX - rect.left) * (400 / rect.width),
             y: (e.clientY - rect.top) * (350 / rect.height)
@@ -947,7 +855,6 @@ class App {
         return null;
     }
 
-    // Agent management
     addAgent() {
         const id = this.agents.length;
         this.agents.push(new Agent(id));
@@ -959,7 +866,6 @@ class App {
     removeSelectedAgent() {
         if (this.selectedAgent !== null && this.agents.length > 0) {
             this.agents.splice(this.selectedAgent, 1);
-            // Reassign IDs
             this.agents.forEach((a, i) => {
                 a.id = i;
                 a.color = AGENT_COLORS[i % AGENT_COLORS.length];
@@ -1019,9 +925,7 @@ class App {
         }
     }
 
-    // Algorithm control
     initAlgorithm() {
-        // Validate
         if (this.graph.vertices.size < 2) {
             alert('Please create a graph with at least 2 vertices.');
             return;
@@ -1040,7 +944,6 @@ class App {
         this.algorithm = new LaCAM(this.graph, this.agents);
         this.algorithm.initialize();
 
-        // Enable controls
         document.getElementById('resetBtn').disabled = false;
         document.getElementById('backBtn').disabled = false;
         document.getElementById('stepBtn').disabled = false;
@@ -1094,7 +997,7 @@ class App {
         document.getElementById('playBtn').textContent = 'Pause';
 
         const speed = document.getElementById('speedSlider').value;
-        const delay = 1100 - speed * 100; // 100ms to 1000ms
+        const delay = 1100 - speed * 100;
 
         this.playInterval = setInterval(() => {
             if (this.algorithm && this.algorithm.state.status === 'running') {
@@ -1134,13 +1037,11 @@ class App {
         this.updateUI();
     }
 
-    // Example presets
     loadExample(name) {
         this.clearGraph();
 
         switch (name) {
             case 'paper':
-                // Figure 1 from paper: a-b-c, a-d
                 const a = this.graph.addVertex(80, 150);
                 const b = this.graph.addVertex(200, 150);
                 const c = this.graph.addVertex(320, 150);
@@ -1148,64 +1049,53 @@ class App {
                 this.graph.addEdge(a, b);
                 this.graph.addEdge(b, c);
                 this.graph.addEdge(a, d);
-
-                // Agent 1: a -> d
                 this.agents.push(new Agent(0, a, d));
-                // Agent 2: c -> b (changed from paper to make it more interesting)
                 this.agents.push(new Agent(1, c, b));
                 break;
 
             case 'swap':
-                // Simple swap: 2 agents on a line
                 const s1 = this.graph.addVertex(100, 175);
                 const s2 = this.graph.addVertex(200, 175);
                 const s3 = this.graph.addVertex(300, 175);
                 this.graph.addEdge(s1, s2);
                 this.graph.addEdge(s2, s3);
-
                 this.agents.push(new Agent(0, s1, s3));
                 this.agents.push(new Agent(1, s3, s1));
                 break;
 
             case 'tunnel':
-                // Tunnel scenario
                 const t1 = this.graph.addVertex(50, 175);
                 const t2 = this.graph.addVertex(125, 175);
                 const t3 = this.graph.addVertex(200, 175);
                 const t4 = this.graph.addVertex(275, 175);
                 const t5 = this.graph.addVertex(350, 175);
-                const t6 = this.graph.addVertex(200, 100); // bypass
+                const t6 = this.graph.addVertex(200, 100);
                 this.graph.addEdge(t1, t2);
                 this.graph.addEdge(t2, t3);
                 this.graph.addEdge(t3, t4);
                 this.graph.addEdge(t4, t5);
                 this.graph.addEdge(t3, t6);
-
                 this.agents.push(new Agent(0, t1, t5));
                 this.agents.push(new Agent(1, t5, t1));
                 break;
 
             case 'grid':
-                // 3x3 grid
                 const gridV = [];
                 for (let row = 0; row < 3; row++) {
                     for (let col = 0; col < 3; col++) {
                         gridV.push(this.graph.addVertex(100 + col * 100, 100 + row * 100));
                     }
                 }
-                // Horizontal edges
                 for (let row = 0; row < 3; row++) {
                     for (let col = 0; col < 2; col++) {
                         this.graph.addEdge(gridV[row * 3 + col], gridV[row * 3 + col + 1]);
                     }
                 }
-                // Vertical edges
                 for (let row = 0; row < 2; row++) {
                     for (let col = 0; col < 3; col++) {
                         this.graph.addEdge(gridV[row * 3 + col], gridV[(row + 1) * 3 + col]);
                     }
                 }
-
                 this.agents.push(new Agent(0, gridV[0], gridV[8]));
                 this.agents.push(new Agent(1, gridV[2], gridV[6]));
                 break;
@@ -1217,7 +1107,6 @@ class App {
         this.render();
     }
 
-    // UI updates
     updateUI() {
         if (!this.algorithm) {
             document.getElementById('stepNumber').textContent = '0';
@@ -1249,19 +1138,14 @@ class App {
         document.getElementById('configsExplored').textContent = state.configurationsExplored;
         document.getElementById('treeSize').textContent = this.algorithm.getTreeSize();
 
-        // Update Open Stack
         this.renderOpenStack();
-
-        // Update Explored Table
         this.renderExploredTable();
 
-        // Update Solution if found
         if (state.solution) {
             document.getElementById('solutionSection').style.display = 'block';
             this.renderSolution();
         }
 
-        // Disable step if done
         if (state.status !== 'running') {
             document.getElementById('stepBtn').disabled = true;
             document.getElementById('playBtn').disabled = true;
@@ -1278,7 +1162,6 @@ class App {
         }
 
         container.innerHTML = '';
-        // Render from top to bottom (reverse order)
         for (let i = state.open.length - 1; i >= 0; i--) {
             const node = state.open[i];
             const isCurrent = node === state.currentHighLevelNode;
@@ -1328,7 +1211,6 @@ class App {
         });
     }
 
-    // Rendering
     render() {
         this.renderGraph();
         this.renderTree();
@@ -1337,11 +1219,10 @@ class App {
 
     renderGraph() {
         const ctx = this.graphCtx;
-        const width = 400, height = 350; // Logical dimensions
+        const width = 400, height = 350;
 
         ctx.clearRect(0, 0, width, height);
 
-        // Draw edges
         ctx.strokeStyle = '#333333';
         ctx.lineWidth = 2;
         this.graph.edges.forEach(edge => {
@@ -1353,7 +1234,6 @@ class App {
             ctx.stroke();
         });
 
-        // Draw drag line
         if (this.dragStart !== null && this.dragEnd !== null) {
             const v1 = this.graph.vertices.get(this.dragStart);
             ctx.strokeStyle = '#ffffff';
@@ -1365,13 +1245,11 @@ class App {
             ctx.setLineDash([]);
         }
 
-        // Draw vertices
         this.graph.vertices.forEach((v, id) => {
             const isHovered = id === this.hoveredVertex;
             const isStart = this.agents.some(a => a.start === id);
             const isGoal = this.agents.some(a => a.goal === id);
 
-            // Vertex circle
             ctx.beginPath();
             ctx.arc(v.x, v.y, isHovered ? 18 : 15, 0, Math.PI * 2);
             ctx.fillStyle = isHovered ? '#ffffff' : '#1a1a1a';
@@ -1380,14 +1258,12 @@ class App {
             ctx.lineWidth = 2;
             ctx.stroke();
 
-            // Label
             ctx.fillStyle = '#fff';
             ctx.font = 'bold 14px sans-serif';
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
             ctx.fillText(v.label, v.x, v.y);
 
-            // Start/goal indicators
             if (isStart || isGoal) {
                 ctx.font = '10px sans-serif';
                 ctx.fillStyle = '#888888';
@@ -1395,14 +1271,12 @@ class App {
             }
         });
 
-        // Draw agents at current positions
         if (this.algorithm && this.algorithm.state.currentHighLevelNode) {
             const config = this.algorithm.state.currentHighLevelNode.config;
             this.agents.forEach(agent => {
                 const vertexId = config.get(agent.id);
                 const v = this.graph.vertices.get(vertexId);
                 if (v) {
-                    // Agent circle
                     ctx.beginPath();
                     ctx.arc(v.x, v.y + 25, 10, 0, Math.PI * 2);
                     ctx.fillStyle = agent.color;
@@ -1411,14 +1285,12 @@ class App {
                     ctx.lineWidth = 2;
                     ctx.stroke();
 
-                    // Agent number
                     ctx.fillStyle = '#000';
                     ctx.font = 'bold 10px sans-serif';
                     ctx.fillText(agent.id + 1, v.x, v.y + 25);
                 }
             });
         } else if (this.agents.length > 0) {
-            // Show agents at start positions
             this.agents.forEach(agent => {
                 if (agent.start !== null) {
                     const v = this.graph.vertices.get(agent.start);
@@ -1445,7 +1317,6 @@ class App {
         const baseHeight = 200;
 
         if (!this.algorithm || !this.algorithm.state.currentHighLevelNode) {
-            // Reset to default size
             this.treeCtx = this.setupCanvas(canvas, 350, baseHeight);
             this.treeCtx.fillStyle = '#555555';
             this.treeCtx.font = '13px sans-serif';
@@ -1459,14 +1330,12 @@ class App {
 
         const currentNode = this.algorithm.state.currentLowLevelNode;
 
-        // Tree layout parameters
         const nodeRadius = 18;
-        const minNodeSpacing = 50; // Minimum horizontal space between node centers
+        const minNodeSpacing = 50;
         const levelHeight = 50;
         const startY = 30;
         const padding = 30;
 
-        // Step 1: Calculate subtree widths (number of leaf nodes or 1 if leaf)
         const subtreeWidths = new Map();
         const calcSubtreeWidth = (node) => {
             if (node.children.length === 0) {
@@ -1482,14 +1351,11 @@ class App {
         };
         const totalLeaves = calcSubtreeWidth(root);
 
-        // Step 2: Calculate required canvas width
         const requiredWidth = Math.max(350, totalLeaves * minNodeSpacing + padding * 2);
 
-        // Step 3: Resize canvas if needed
         this.treeCtx = this.setupCanvas(canvas, requiredWidth, baseHeight);
         const ctx = this.treeCtx;
 
-        // Step 4: Assign positions based on subtree widths
         const nodePositions = new Map();
         const assignPositions = (node, depth, leftX) => {
             const subtreeWidth = subtreeWidths.get(node.id);
@@ -1510,10 +1376,8 @@ class App {
 
         assignPositions(root, 0, padding);
 
-        // Clear canvas (after resize)
         ctx.clearRect(0, 0, requiredWidth, baseHeight);
 
-        // Draw edges
         ctx.strokeStyle = '#333333';
         ctx.lineWidth = 2;
         nodePositions.forEach(({ x, y, node }) => {
@@ -1528,7 +1392,6 @@ class App {
             });
         });
 
-        // Highlight path to current node
         if (currentNode) {
             ctx.strokeStyle = '#64c8ff';
             ctx.lineWidth = 3;
@@ -1546,40 +1409,31 @@ class App {
             }
         }
 
-        // Draw nodes
         nodePositions.forEach(({ x, y, node }) => {
             const isCurrent = node === currentNode;
 
-            // Node circle
             ctx.beginPath();
             ctx.arc(x, y, nodeRadius, 0, Math.PI * 2);
 
-            // Color logic:
-            // - Current node (being processed right now) → CYAN
-            // - Searched node (already processed) → GREY
-            // - Pending node (in queue, not yet processed) → DARK with outline
             if (isCurrent) {
-                ctx.fillStyle = '#64c8ff'; // Cyan - currently selected
+                ctx.fillStyle = '#64c8ff';
             } else if (node.isSearched) {
-                ctx.fillStyle = '#555555'; // Grey - already searched
+                ctx.fillStyle = '#555555';
             } else {
-                ctx.fillStyle = '#1a1a1a'; // Dark - pending
+                ctx.fillStyle = '#1a1a1a';
             }
             ctx.fill();
 
-            // Border: cyan for current, normal for others
             ctx.strokeStyle = isCurrent ? '#64c8ff' : (node.isSearched ? '#333333' : '#444444');
             ctx.lineWidth = isCurrent ? 3 : 2;
             ctx.stroke();
 
-            // Label
             ctx.fillStyle = isCurrent ? '#000' : '#fff';
             ctx.font = '10px sans-serif';
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
             ctx.fillText(node.getLabel(this.graph), x, y);
 
-            // Current indicator
             if (isCurrent) {
                 ctx.fillStyle = '#64c8ff';
                 ctx.font = 'bold 12px sans-serif';
@@ -1590,13 +1444,12 @@ class App {
 
     renderMiniGraph() {
         const ctx = this.miniCtx;
-        const width = 150, height = 120; // Logical dimensions
+        const width = 150, height = 120;
 
         ctx.clearRect(0, 0, width, height);
 
         if (this.graph.vertices.size === 0) return;
 
-        // Calculate bounds and scale
         let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
         this.graph.vertices.forEach(v => {
             minX = Math.min(minX, v.x);
@@ -1615,7 +1468,6 @@ class App {
             y: padding + (v.y - minY) * scale
         });
 
-        // Draw edges
         ctx.strokeStyle = '#333333';
         ctx.lineWidth = 1;
         this.graph.edges.forEach(edge => {
@@ -1627,7 +1479,6 @@ class App {
             ctx.stroke();
         });
 
-        // Draw vertices
         this.graph.vertices.forEach((v, id) => {
             const pos = transform(v);
             ctx.beginPath();
@@ -1638,7 +1489,6 @@ class App {
             ctx.stroke();
         });
 
-        // Draw agents
         if (this.algorithm && this.algorithm.state.currentHighLevelNode) {
             const config = this.algorithm.state.currentHighLevelNode.config;
             this.agents.forEach(agent => {
@@ -1656,7 +1506,6 @@ class App {
     }
 }
 
-// Initialize app when DOM is ready
 document.addEventListener('DOMContentLoaded', () => {
     window.app = new App();
 });
