@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LaCAM Algorithm Visualizer</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Toolbar -->
+        <header class="toolbar">
+            <div class="toolbar-section">
+                <button id="clearGraphBtn" class="btn">Clear Graph</button>
+                <div class="dropdown">
+                    <button id="loadExampleBtn" class="btn">Load Example</button>
+                    <div class="dropdown-content" id="exampleDropdown">
+                        <a href="#" data-example="paper">Paper Example (Fig. 1)</a>
+                        <a href="#" data-example="swap">Simple Swap</a>
+                        <a href="#" data-example="tunnel">Tunnel</a>
+                        <a href="#" data-example="grid">3x3 Grid</a>
+                    </div>
+                </div>
+            </div>
+            <div class="toolbar-divider"></div>
+            <div class="toolbar-section">
+                <button id="resetBtn" class="btn" disabled>Reset</button>
+                <button id="backBtn" class="btn" disabled>Back</button>
+                <button id="stepBtn" class="btn btn-primary" disabled>Step</button>
+                <button id="playBtn" class="btn" disabled>Play</button>
+            </div>
+            <div class="toolbar-section">
+                <label>Speed:</label>
+                <input type="range" id="speedSlider" min="1" max="10" value="5">
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Left Panel: Graph Editor -->
+            <section class="panel graph-panel">
+                <h2>Graph Editor</h2>
+                <canvas id="graphCanvas" width="400" height="350"></canvas>
+
+                <div class="mode-selector">
+                    <label><input type="radio" name="mode" value="edit" checked> Edit Graph</label>
+                    <label><input type="radio" name="mode" value="start"> Set Starts</label>
+                    <label><input type="radio" name="mode" value="goal"> Set Goals</label>
+                </div>
+
+                <div class="instructions" id="instructions">
+                    Click to add vertex. Drag between vertices to add edge. Click vertex + Delete to remove.
+                </div>
+
+                <div class="agents-section">
+                    <h3>Agents</h3>
+                    <div id="agentsList"></div>
+                    <div class="agent-controls">
+                        <button id="addAgentBtn" class="btn btn-small">+ Add Agent</button>
+                        <button id="removeAgentBtn" class="btn btn-small" disabled>- Remove</button>
+                    </div>
+                </div>
+
+                <button id="initAlgorithmBtn" class="btn btn-primary btn-full">Initialize Algorithm</button>
+            </section>
+
+            <!-- Center Panel: Algorithm State -->
+            <section class="panel algorithm-panel">
+                <h2>Algorithm State</h2>
+
+                <div class="state-section">
+                    <h3>Open Stack <span class="hint">(top = current)</span></h3>
+                    <div id="openStack" class="open-stack">
+                        <div class="empty-state">Initialize algorithm to begin</div>
+                    </div>
+                </div>
+
+                <div class="state-section">
+                    <h3>Constraint Tree</h3>
+                    <div class="tree-container">
+                        <canvas id="treeCanvas" width="350" height="200"></canvas>
+                    </div>
+                    <div class="tree-legend">
+                        <span><span class="legend-dot selected"></span> Selected</span>
+                        <span><span class="legend-dot searched"></span> Searched</span>
+                        <span><span class="legend-dot pending"></span> Pending</span>
+                    </div>
+                </div>
+
+                <div class="state-section">
+                    <h3>Current Configuration</h3>
+                    <canvas id="miniGraphCanvas" width="150" height="120"></canvas>
+                </div>
+            </section>
+
+            <!-- Right Panel: Info -->
+            <section class="panel info-panel">
+                <h2>Information</h2>
+
+                <div class="info-section">
+                    <div class="info-row">
+                        <span class="label">Step:</span>
+                        <span id="stepNumber">0</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="label">Phase:</span>
+                        <span id="phaseInfo" class="phase-badge">-</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="label">Status:</span>
+                        <span id="statusInfo" class="status-badge">Not Started</span>
+                    </div>
+                </div>
+
+                <div class="info-section">
+                    <h3>Current Action</h3>
+                    <div id="stepDescription" class="description-box">
+                        Create a graph and add agents to begin.
+                    </div>
+                </div>
+
+                <div class="info-section">
+                    <h3>Phase Explanation</h3>
+                    <div id="phaseExplanation" class="phase-explanation-box">
+                        <div class="phase-title" id="phaseTitle">-</div>
+                        <div class="phase-detail" id="phaseDetail">
+                            The algorithm uses a two-level search: HIGH-LEVEL searches configurations (agent positions), LOW-LEVEL searches constraints (which agent goes where).
+                        </div>
+                    </div>
+                </div>
+
+                <div class="info-section">
+                    <h3>Statistics</h3>
+                    <div class="stats-grid">
+                        <div class="stat">
+                            <span class="stat-value" id="nodesGenerated">0</span>
+                            <span class="stat-label">Nodes</span>
+                        </div>
+                        <div class="stat">
+                            <span class="stat-value" id="configsExplored">0</span>
+                            <span class="stat-label">Configs</span>
+                        </div>
+                        <div class="stat">
+                            <span class="stat-value" id="treeSize">0</span>
+                            <span class="stat-label">Tree Size</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="info-section">
+                    <h3>Explored Configurations</h3>
+                    <div id="exploredTable" class="explored-table">
+                        <div class="empty-state">No configurations explored yet</div>
+                    </div>
+                </div>
+
+                <div class="info-section" id="solutionSection" style="display: none;">
+                    <h3>Solution Path</h3>
+                    <div id="solutionPath" class="solution-path"></div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
